@@ -1,120 +1,288 @@
-import { DEFAULT_CLUBS, DEFAULT_DRILLS, CONTACT_TYPES } from './data.js';
-import { todayISO, getShots, getUserClubs, getUserDrills, getNote } from './app.js';
+import {
+  getClubs, getDrills, getShots, todayYMD,
+  aggregateByClub, pct, toCSV, downloadText, toast
+} from "./app.js";
 
-const fromDate=document.getElementById('fromDate');
-const toDate=document.getElementById('toDate');
-const drillFilter=document.getElementById('drillFilter');
-const clubFilter=document.getElementById('clubFilter');
-const thead=document.getElementById('thead');
-const tbody=document.getElementById('tbody');
-const viewByClubBtn=document.getElementById('viewByClub');
-const viewByDrillBtn=document.getElementById('viewByDrill');
-const exportBtn=document.getElementById('exportCsv');
+const dateMode = document.getElementById("dateMode");
+const singleDateField = document.getElementById("singleDateField");
+const singleDate = document.getElementById("singleDate");
+const drillFilter = document.getElementById("drillFilter");
+const clubFilter = document.getElementById("clubFilter");
+const viewMode = document.getElementById("viewMode");
+const matchCount = document.getElementById("matchCount");
+const successRate = document.getElementById("successRate");
+const thead = document.getElementById("thead");
+const tbody = document.getElementById("tbody");
+const btnExport = document.getElementById("btnExport");
 
-let clubs=getUserClubs(DEFAULT_CLUBS);
-let drills=getUserDrills(DEFAULT_DRILLS);
-let mode='club';
+let clubs = getClubs();
+let drills = getDrills();
+let shots = getShots();
 
-function isoToInt(s){ return parseInt((s||'').replaceAll('-','')||'0',10); }
-function pct(a,b){ return b?Math.round(a/b*100)+'%':'–'; }
+function idxClubs() {
+  const m = new Map();
+  for (const c of clubs) m.set(c.id, c);
+  return m;
+}
+function idxDrills() {
+  const m = new Map();
+  for (const d of drills) m.set(d.id, d);
+  return m;
+}
+const drillMap = idxDrills();
+const clubMap = idxClubs();
 
-function init(){
-  const to=todayISO();
-  const from=new Date(Date.now()-30*24*3600*1000).toISOString().slice(0,10);
-  fromDate.value=from; toDate.value=to;
+function renderFilters() {
+  // date
+  singleDate.value = todayYMD();
 
-  drillFilter.innerHTML='<option value="">All drills</option>';
-  for(const d of drills){ const o=document.createElement('option'); o.value=d.id; o.textContent=d.name; drillFilter.appendChild(o); }
+  // drill
+  drillFilter.innerHTML = "";
+  drillFilter.appendChild(new Option("All drills", ""));
+  for (const d of drills) drillFilter.appendChild(new Option(d.name, d.id));
 
-  clubFilter.innerHTML='<option value="">All clubs</option>';
-  for(const c of clubs){ const o=document.createElement('option'); o.value=c.id; o.textContent=c.name; clubFilter.appendChild(o); }
+  // club
+  clubFilter.innerHTML = "";
+  clubFilter.appendChild(new Option("All clubs", ""));
+  for (const c of clubs) clubFilter.appendChild(new Option(c.name, c.id));
 }
 
-function filtered(){
-  const shots=getShots();
-  const f=isoToInt(fromDate.value);
-  const t=isoToInt(toDate.value);
-  const d=drillFilter.value;
-  const c=clubFilter.value;
-  return shots.filter(s=>{
-    const di=isoToInt(s.date);
-    if(f && di<f) return false;
-    if(t && di>t) return false;
-    if(d && s.drillId!==d) return false;
-    if(c && s.clubId!==c) return false;
-    return true;
-  });
+function applyFilters() {
+  const dm = dateMode.value;
+  const dSingle = singleDate.value;
+  const df = drillFilter.value;
+  const cf = clubFilter.value;
+
+  let filtered = shots.slice();
+
+  if (dm === "single" && dSingle) filtered = filtered.filter(s => s.date === dSingle);
+  if (df) filtered = filtered.filter(s => s.drillId === df);
+  if (cf) filtered = filtered.filter(s => s.clubId === cf);
+
+  // Stats badges
+  matchCount.textContent = String(filtered.length);
+  const success = filtered.filter(s => s.outcome === "success").length;
+  successRate.textContent = filtered.length ? `${success}/${filtered.length} (${Math.round((success/filtered.length)*100)}%)` : "–";
+
+  renderTable(filtered);
 }
 
-function aggregate(){
-  const shots=filtered();
-  const agg={};
-  for(const s of shots){
-    const key = mode==='club'?s.clubId:s.drillId;
-    if(!agg[key]){
-      agg[key]={label:(mode==='club'?(clubs.find(x=>x.id===key)?.name||key):(drills.find(x=>x.id===key)?.name||key)),
-        total:0,success:0,miss:0,solid:0,thin:0,fat:0,toe:0,heel:0,miss_short:0,miss_long:0,miss_left:0,miss_right:0};
-    }
-    const a=agg[key];
-    a.total+=1;
-    if(s.outcome==='success') a.success+=1;
-    if(s.outcome==='miss'){ a.miss+=1; if(s.missDirection) a['miss_'+s.missDirection]+=1; }
-    for(const k of CONTACT_TYPES){ if(s.contact?.[k]) a[k]+=1; }
+function renderTable(filteredShots) {
+  const mode = viewMode.value;
+
+  if (mode === "raw") {
+    renderRaw(filteredShots);
+    return;
   }
-  return Object.values(agg).sort((x,y)=>y.total-x.total);
-}
-
-function render(){
-  const rows=aggregate();
-  tbody.innerHTML='';
-  if(mode==='club'){
-    thead.innerHTML=`<tr><th>Club</th><th>Success</th><th>Miss</th><th>Success %</th><th>Solid</th><th>Thin</th><th>Fat</th><th>Toe</th><th>Heel</th><th>Miss: Short</th><th>Miss: Long</th><th>Miss: Left</th><th>Miss: Right</th></tr>`;
-    for(const a of rows){
-      const tr=document.createElement('tr');
-      tr.innerHTML=`<td>${a.label}</td><td>${a.success}</td><td>${a.miss}</td><td>${pct(a.success,a.total)}</td><td>${a.solid}</td><td>${a.thin}</td><td>${a.fat}</td><td>${a.toe}</td><td>${a.heel}</td><td>${a.miss_short}</td><td>${a.miss_long}</td><td>${a.miss_left}</td><td>${a.miss_right}</td>`;
-      tbody.appendChild(tr);
-    }
-  }else{
-    thead.innerHTML=`<tr><th>Drill</th><th>Success</th><th>Miss</th><th>Success %</th><th>Miss: Short</th><th>Miss: Long</th><th>Miss: Left</th><th>Miss: Right</th></tr>`;
-    for(const a of rows){
-      const tr=document.createElement('tr');
-      tr.innerHTML=`<td>${a.label}</td><td>${a.success}</td><td>${a.miss}</td><td>${pct(a.success,a.total)}</td><td>${a.miss_short}</td><td>${a.miss_long}</td><td>${a.miss_left}</td><td>${a.miss_right}</td>`;
-      tbody.appendChild(tr);
-    }
+  if (mode === "byClub") {
+    renderByClub(filteredShots);
+    return;
+  }
+  if (mode === "byDrill") {
+    renderByDrill(filteredShots);
+    return;
+  }
+  if (mode === "byDate") {
+    renderByDate(filteredShots);
+    return;
   }
 }
 
-function csvEscape(v){
-  const s=(v??'').toString();
-  if(s.includes('"')||s.includes(',')||s.includes('\n')) return '"'+s.replaceAll('"','""')+'"';
-  return s;
+function renderByClub(filtered) {
+  thead.innerHTML = `
+    <tr>
+      <th>Club</th>
+      <th>Success</th>
+      <th>Miss</th>
+      <th>Success %</th>
+      <th>Solid</th>
+      <th>Thin</th>
+      <th>Fat</th>
+      <th>Toe</th>
+      <th>Heel</th>
+      <th>Miss: Short</th>
+      <th>Miss: Long</th>
+      <th>Miss: Left</th>
+      <th>Miss: Right</th>
+    </tr>
+  `;
+  tbody.innerHTML = "";
+
+  const agg = aggregateByClub(filtered, clubMap);
+  for (const a of agg) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${a.clubName}</td>
+      <td>${a.success}</td>
+      <td>${a.miss}</td>
+      <td>${pct(a.success, a.outcomeTotal)}</td>
+      <td>${a.solid}</td>
+      <td>${a.thin}</td>
+      <td>${a.fat}</td>
+      <td>${a.toe}</td>
+      <td>${a.heel}</td>
+      <td>${a.miss_short}</td>
+      <td>${a.miss_long}</td>
+      <td>${a.miss_left}</td>
+      <td>${a.miss_right}</td>
+    `;
+    tbody.appendChild(tr);
+  }
 }
 
-function exportCSV(){
-  const shots=filtered().slice().sort((a,b)=>a.timestamp.localeCompare(b.timestamp));
-  const headers=['id','date','timestamp','drillId','drillName','clubId','clubName','outcome','missDirection','miss_type','miss_left','miss_right','miss_short','miss_long',...CONTACT_TYPES.map(k=>'contact_'+k),'notes'];
-  const lines=[headers.join(',')];
-  for(const s of shots){
-    const note=getNote(s.date,s.drillId)||'';
-    const missType=s.missDirection?(s.missDirection[0].toUpperCase()+s.missDirection.slice(1)):'';
-    const row={
-      id:s.id,date:s.date,timestamp:s.timestamp,drillId:s.drillId,drillName:s.drillName,clubId:s.clubId,clubName:s.clubName,
-      outcome:s.outcome,missDirection:(s.missDirection||''),miss_type:missType,
-      miss_left:s.missDirection==='left'?1:0,miss_right:s.missDirection==='right'?1:0,miss_short:s.missDirection==='short'?1:0,miss_long:s.missDirection==='long'?1:0,
-      notes:note
+function renderByDrill(filtered) {
+  thead.innerHTML = `
+    <tr>
+      <th>Drill</th>
+      <th>Shots</th>
+      <th>Success</th>
+      <th>Miss</th>
+      <th>Success %</th>
+    </tr>
+  `;
+  tbody.innerHTML = "";
+
+  const map = new Map();
+  for (const s of filtered) {
+    const id = s.drillId || "unknown";
+    if (!map.has(id)) map.set(id, { drillId:id, drillName: drillMap.get(id)?.name ?? s.drillName ?? id, shots:0, success:0, miss:0 });
+    const r = map.get(id);
+    r.shots += 1;
+    if (s.outcome === "success") r.success += 1;
+    if (s.outcome === "miss") r.miss += 1;
+  }
+
+  const rows = Array.from(map.values()).sort((a,b)=>a.drillName.localeCompare(b.drillName));
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.drillName}</td>
+      <td>${r.shots}</td>
+      <td>${r.success}</td>
+      <td>${r.miss}</td>
+      <td>${pct(r.success, r.shots)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function renderByDate(filtered) {
+  thead.innerHTML = `
+    <tr>
+      <th>Date</th>
+      <th>Shots</th>
+      <th>Success</th>
+      <th>Miss</th>
+      <th>Success %</th>
+    </tr>
+  `;
+  tbody.innerHTML = "";
+
+  const map = new Map();
+  for (const s of filtered) {
+    const d = s.date || "unknown";
+    if (!map.has(d)) map.set(d, { date:d, shots:0, success:0, miss:0 });
+    const r = map.get(d);
+    r.shots += 1;
+    if (s.outcome === "success") r.success += 1;
+    if (s.outcome === "miss") r.miss += 1;
+  }
+
+  const rows = Array.from(map.values()).sort((a,b)=>a.date.localeCompare(b.date));
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.date}</td>
+      <td>${r.shots}</td>
+      <td>${r.success}</td>
+      <td>${r.miss}</td>
+      <td>${pct(r.success, r.shots)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function renderRaw(filtered) {
+  thead.innerHTML = `
+    <tr>
+      <th>Date</th>
+      <th>Time (ISO)</th>
+      <th>Drill</th>
+      <th>Club</th>
+      <th>Outcome</th>
+      <th>Miss dir</th>
+      <th>Solid</th>
+      <th>Thin</th>
+      <th>Fat</th>
+      <th>Toe</th>
+      <th>Heel</th>
+    </tr>
+  `;
+  tbody.innerHTML = "";
+
+  const rows = filtered.slice().sort((a,b)=>(a.timestamp||"").localeCompare(b.timestamp||""));
+  for (const s of rows) {
+    const c = s.contact || {};
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${s.date ?? ""}</td>
+      <td style="font-family:var(--mono); font-size:.84rem;">${s.timestamp ?? ""}</td>
+      <td>${drillMap.get(s.drillId)?.name ?? s.drillName ?? s.drillId ?? ""}</td>
+      <td>${clubMap.get(s.clubId)?.name ?? s.clubName ?? s.clubId ?? ""}</td>
+      <td>${s.outcome ?? ""}</td>
+      <td>${s.missDirection ?? ""}</td>
+      <td>${c.solid ? 1 : 0}</td>
+      <td>${c.thin ? 1 : 0}</td>
+      <td>${c.fat ? 1 : 0}</td>
+      <td>${c.toe ? 1 : 0}</td>
+      <td>${c.heel ? 1 : 0}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function exportCSV() {
+  const rows = shots.slice().sort((a,b)=>(a.timestamp||"").localeCompare(b.timestamp||"")).map(s => {
+    const c = s.contact || {};
+    const miss = s.missDirection ?? "";
+    return {
+      id: s.id ?? "",
+      date: s.date ?? "",
+      timestamp: s.timestamp ?? "",
+      drillId: s.drillId ?? "",
+      drillName: drillMap.get(s.drillId)?.name ?? s.drillName ?? "",
+      clubId: s.clubId ?? "",
+      clubName: clubMap.get(s.clubId)?.name ?? s.clubName ?? "",
+      outcome: s.outcome ?? "",
+      missDirection: miss,
+      miss_left: miss === "left" ? 1 : 0,
+      miss_right: miss === "right" ? 1 : 0,
+      miss_short: miss === "short" ? 1 : 0,
+      miss_long: miss === "long" ? 1 : 0,
+      solid: c.solid ? 1 : 0,
+      thin: c.thin ? 1 : 0,
+      fat: c.fat ? 1 : 0,
+      toe: c.toe ? 1 : 0,
+      heel: c.heel ? 1 : 0,
     };
-    for(const k of CONTACT_TYPES){ row['contact_'+k]=s.contact?.[k]?1:0; }
-    lines.push(headers.map(h=>csvEscape(row[h])).join(','));
-  }
-  const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download='golf_practice_export.csv';
-  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  });
+
+  const csv = toCSV(rows);
+  const filename = `golf-practice-shots-${todayYMD()}.csv`;
+  downloadText(filename, csv, "text/csv");
+  toast("Downloaded CSV");
 }
 
-[fromDate,toDate,drillFilter,clubFilter].forEach(el=>el.addEventListener('change',render));
-viewByClubBtn.addEventListener('click',()=>{mode='club';render();});
-viewByDrillBtn.addEventListener('click',()=>{mode='drill';render();});
-exportBtn.addEventListener('click',exportCSV);
+// Wiring
+dateMode.addEventListener("change", () => {
+  singleDateField.style.display = (dateMode.value === "single") ? "" : "none";
+  applyFilters();
+});
+singleDate.addEventListener("change", applyFilters);
+drillFilter.addEventListener("change", applyFilters);
+clubFilter.addEventListener("change", applyFilters);
+viewMode.addEventListener("change", applyFilters);
+btnExport.addEventListener("click", exportCSV);
 
-init(); render();
+renderFilters();
+applyFilters();

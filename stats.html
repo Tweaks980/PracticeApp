@@ -2,49 +2,80 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Golf Practice – Stats</title>
-  <link rel="stylesheet" href="styles.css?v=1">
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <div class="shell">
     <div class="topbar">
-      <div class="brand">Golf Practice</div>
+      <div class="brand">
+        <div class="title">Stats</div>
+        <div class="sub">Filter by date / drill / club. Export raw shot logs to CSV for Excel.</div>
+      </div>
       <div class="nav">
-        <a href="index.html">Log</a>
-        <a class="active" href="stats.html">Stats</a>
+        <a href="./index.html">Log</a>
+        <a class="active" href="./stats.html">Stats</a>
+        <button id="btnExport" class="primary">Export CSV</button>
       </div>
     </div>
 
     <div class="card">
       <div class="row">
-        <div class="field"><label>From</label><input id="fromDate" type="date"></div>
-        <div class="field"><label>To</label><input id="toDate" type="date"></div>
-        <div class="field" style="min-width:220px;"><label>Drill</label><select id="drillFilter"></select></div>
-        <div class="field" style="min-width:180px;"><label>Club</label><select id="clubFilter"></select></div>
+        <div class="field" style="min-width:220px;">
+          <label class="small">Date</label>
+          <select id="dateMode">
+            <option value="all">All dates</option>
+            <option value="single">Single date</option>
+          </select>
+        </div>
+        <div class="field" id="singleDateField" style="display:none;">
+          <label class="small">Pick date</label>
+          <input id="singleDate" type="date" />
+        </div>
+
+        <div class="field" style="flex:1; min-width:240px;">
+          <label class="small">Drill</label>
+          <select id="drillFilter"></select>
+        </div>
+
+        <div class="field" style="min-width:220px;">
+          <label class="small">Club</label>
+          <select id="clubFilter"></select>
+        </div>
+
+        <div class="field" style="min-width:220px;">
+          <label class="small">View</label>
+          <select id="viewMode">
+            <option value="byClub">Summary (by club)</option>
+            <option value="byDrill">Summary (by drill)</option>
+            <option value="byDate">Summary (by date)</option>
+            <option value="raw">Raw shots</option>
+          </select>
+        </div>
       </div>
 
       <div class="hr"></div>
 
-      <div class="btnrow">
-        <button class="btn" id="viewByClub">View: By club</button>
-        <button class="btn" id="viewByDrill">View: By drill</button>
-        <button class="btn primary" id="exportCsv">Export CSV (raw shots)</button>
+      <div class="row" style="justify-content:space-between;">
+        <div class="badge">Shots matched: <strong id="matchCount">0</strong></div>
+        <div class="badge">Success rate: <strong id="successRate">–</strong></div>
       </div>
 
-      <div class="hr"></div>
-
-      <div class="tablewrap">
+      <div class="table-wrap">
         <table>
           <thead id="thead"></thead>
           <tbody id="tbody"></tbody>
         </table>
       </div>
 
-      <div class="foot">Excel tip: use miss_left/miss_right/miss_short/miss_long to find common misses.</div>
+      <div class="hint">
+        Export always downloads <strong>raw shot logs</strong> (one row per shot) so you can pivot/filter any way in Excel later.
+      </div>
     </div>
   </div>
 
-  <script type="module" src="stats.js?v=1"></script>
+  <div id="toast" class="toast"></div>
+  <script type="module" src="./stats.js"></script>
 </body>
 </html>

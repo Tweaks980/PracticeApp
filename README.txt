@@ -1,13 +1,19 @@
-Golf Practice App – Local Test Build
+Golf Practice Tracker (Static HTML App)
 
-How to run (recommended):
-1) On a computer, put these files in a folder.
-2) In that folder, run:
-   python3 -m http.server 8000
-3) Open: http://localhost:8000/
+How to run:
+- Open index.html in a browser.
+- Everything saves to your browser's localStorage on this device.
 
-Why a server?
-- This app uses ES modules (type="module"), and many browsers block module imports when opening index.html directly from the file system.
+Files:
+- index.html + log.js: logging page (date + drill + club + outcomes/contact)
+- stats.html + stats.js: stats / filters + CSV export (raw shot logs)
+- data.js: default drills + default clubs (edit here if you want)
+- app.js: shared storage + aggregation helpers
+- styles.css: styling
 
-Phone testing:
-- Once you're happy locally, publish to GitHub Pages and open the site in Safari.
+Tip (iPhone):
+- If you want this to behave like an "app", add it to your Home Screen from Safari's share menu.
+
+- Putting drills: contact section hidden automatically (Success/Miss still required)
+
+Defaults updated: includes Driver + full drill list.

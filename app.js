@@ -1,7 +1,6 @@
 import { DEFAULT_DRILLS, DEFAULT_CLUBS, ensure28Drills } from "./data.js";
 
 const KEYS = {
-  NOTES: "golfPracticeNotes_v1",
   SHOTS: "golfPracticeShots_v1",
   CLUBS: "golfPracticeClubs_v1",
   DRILLS: "golfPracticeDrills_v1",
@@ -167,19 +166,4 @@ export function listSessionDates(shots, drillId=null) {
     if (!drillId || s.drillId === drillId) set.add(s.date);
   }
   return Array.from(set).sort(); // yyyy-mm-dd sorts naturally
-}
-
-export function getNotes() {
-  return loadJSON(KEYS.NOTES, {});
-}
-
-export function getNote(date, drillId) {
-  const notes = getNotes();
-  return notes[`${date}__${drillId}`] || "";
-}
-
-export function saveNote(date, drillId, text) {
-  const notes = getNotes();
-  notes[`${date}__${drillId}`] = text;
-  saveJSON(KEYS.NOTES, notes);
 }

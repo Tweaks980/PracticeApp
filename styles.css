@@ -315,3 +315,5 @@ code.kbd{
   .mini-grid{grid-template-columns: 1fr 1fr; }
   .badge{width:100%; justify-content:space-between}
 }
+
+.hidden{display:none !important;}

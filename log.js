@@ -19,14 +19,13 @@ const clubPillsEl = document.getElementById("clubPills");
 const clubLabelEl = document.getElementById("clubLabel");
 const shotCountEl = document.getElementById("shotCount");
 const clubTableBody = document.getElementById("clubTableBody");
-const sessionNotesEl = document.getElementById("sessionNotes");
-const sessionShotsBody = document.getElementById("sessionShotsBody");
 
 const btnPrev = document.getElementById("btnPrev");
 const btnNext = document.getElementById("btnNext");
 const btnUndo = document.getElementById("btnUndo");
 
 const contactGrid = document.getElementById("contactGrid");
+const contactSection = document.getElementById("contactSection");
 const btnSuccess = document.getElementById("btnSuccess");
 const btnMiss = document.getElementById("btnMiss");
 const missDirWrap = document.getElementById("missDirWrap");
@@ -220,7 +219,7 @@ function commitShot(outcome, missDirection=null) {
     drillName: d?.name ?? selectedDrillId,
     clubId: selectedClubId,
     clubName: c?.name ?? selectedClubId,
-    contact: { ...currentContact },
+    contact: isPuttingDrill(selectedDrillId) ? {} : { ...currentContact },
     outcome,
     missDirection: outcome === "miss" ? missDirection : null,
   };
@@ -232,7 +231,7 @@ function commitShot(outcome, missDirection=null) {
   missDirWrap.classList.add("hidden");
 
   toast(outcome === "success" ? "Logged: Success" : `Logged: Miss (${missDirection})`);
-  renderTable(); renderSessionShots(); loadNotes();
+  renderTable();
   updatePrevNextButtons();
 }
 
@@ -251,7 +250,7 @@ function undoLastShot() {
   deleteShotById(last.id);
   shots = getShots();
   toast("Deleted last shot");
-  renderTable(); renderSessionShots(); loadNotes();
+  renderTable();
   updatePrevNextButtons();
 }
 
@@ -272,7 +271,7 @@ function goToSessionOffset(delta) {
   selectedDate = next;
   dateEl.value = selectedDate;
   setUIState({ selectedDate });
-  renderTable(); renderSessionShots(); loadNotes();
+  renderTable();
   updatePrevNextButtons();
   toast(`Viewing ${selectedDate}`);
 }
@@ -408,7 +407,7 @@ function init() {
   dateEl.addEventListener("change", () => {
     selectedDate = dateEl.value || todayYMD();
     setUIState({ selectedDate });
-    renderTable(); renderSessionShots(); loadNotes();
+    renderTable();
     updatePrevNextButtons();
     toast(`Viewing ${selectedDate}`);
   });
@@ -420,7 +419,7 @@ function init() {
     selectedDrillId = drillEl.value;
     setUIState({ selectedDrillId });
     renderDrillCard();
-    renderTable(); renderSessionShots(); loadNotes();
+    renderTable();
     updatePrevNextButtons();
   });
 
@@ -474,48 +473,29 @@ function init() {
       setUIState({ selectedClubId });
     }
     renderClubPills();
-    renderTable(); renderSessionShots(); loadNotes();
+    renderTable();
     closeModal();
     toast("Clubs saved");
   });
 
   renderDrillCard();
-  renderTable(); renderSessionShots(); loadNotes();
+  renderTable();
   updatePrevNextButtons();
 }
 
 init();
 
-import { getNote, saveNote } from "./app.js";
-
-function loadNotes() {
-  if (!selectedDrillId) return;
-  sessionNotesEl.value = getNote(selectedDate, selectedDrillId);
+function isPuttingDrill(drillId) {
+  return (drillId || "").startsWith("putting-");
 }
 
-sessionNotesEl.addEventListener("input", () => {
-  if (!selectedDrillId) return;
-  saveNote(selectedDate, selectedDrillId, sessionNotesEl.value);
-});
-
-function renderSessionShots() {
-  if (!sessionShotsBody) return;
-  const session = currentSessionShots();
-  sessionShotsBody.innerHTML = "";
-  for (const s of session) {
-    const contacts = Object.entries(s.contact || {})
-      .filter(([_,v]) => v)
-      .map(([k]) => k)
-      .join(", ");
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${s.date}</td>
-      <td>${s.drillName}</td>
-      <td>${s.clubName}</td>
-      <td>${s.outcome}</td>
-      <td>${s.missDirection || ""}</td>
-      <td>${contacts}</td>
-    `;
-    sessionShotsBody.appendChild(tr);
+function updatePuttingUI() {
+  if (!contactSection) return;
+  const putting = isPuttingDrill(selectedDrillId);
+  contactSection.classList.toggle("hidden", putting);
+  if (putting) {
+    // ensure no contact tags are left selected
+    Object.keys(currentContact).forEach(k => currentContact[k] = false);
+    renderContactGrid();
   }
 }

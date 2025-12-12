@@ -39,6 +39,4 @@ export const DEFAULT_CLUBS = [
   // Woods
   { id:"7W", name:"7W", loft:21, carryAvg:185, carryMin:177, carryMax:193, notes:"" },
   { id:"3W", name:"3W", loft:15, carryAvg:200, carryMin:192, carryMax:209, notes:"" },
-  { id:"D", name:"Driver", loft:10.5, carryAvg:250, carryMin:235, carryMax:280, notes:"" },
-
 ];

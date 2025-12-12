@@ -1,4 +1,4 @@
-import { getNote,
+import {
   getClubs, getDrills, getShots, todayYMD,
   aggregateByClub, pct, toCSV, downloadText, toast
 } from "./app.js";
@@ -250,7 +250,6 @@ function renderRaw(filtered) {
 function exportCSV() {
   const rows = shots.slice().sort((a,b)=>(a.timestamp||"").localeCompare(b.timestamp||"")).map(s => {
     const c = s.contact || {};
-    const note = getNote(s.date, s.drillId);
     return {
       id: s.id ?? "",
       date: s.date ?? "",
@@ -266,7 +265,6 @@ function exportCSV() {
       fat: c.fat ? 1 : 0,
       toe: c.toe ? 1 : 0,
       heel: c.heel ? 1 : 0,
-      notes: note,
     };
   });
 

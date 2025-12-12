@@ -13,3 +13,5 @@ Files:
 
 Tip (iPhone):
 - If you want this to behave like an "app", add it to your Home Screen from Safari's share menu.
+
+- Putting drills: contact section hidden automatically (Success/Miss still required)

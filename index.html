@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Golf Practice</title>
+  <link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+  <div class="shell">
+    <div class="topbar">
+      <div class="brand">Golf Practice</div>
+      <div class="nav">
+        <a class="active" href="index.html">Log</a>
+        <a href="stats.html">Stats</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="field" style="min-width:160px;flex:0.7;">
+          <label>Date</label>
+          <input id="dateInput" type="date" />
+        </div>
+        <div class="field" style="min-width:220px;flex:1.2;">
+          <label>Find drill</label>
+          <input id="drillSearch" type="search" placeholder="Type to filter drills…" />
+        </div>
+        <div class="field" style="min-width:220px;flex:1.2;">
+          <label>Drill</label>
+          <select id="drillSelect"></select>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div>
+        <div class="h2">Drill details</div>
+        <div class="p" id="drillDesc">Select a drill.</div>
+        <div class="badges" id="drillBadges"></div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div>
+        <div class="h2">Club</div>
+        <div class="p">Tap a club, then log outcomes. Carry ranges are shown on the pills.</div>
+        <div class="pills" id="clubPills"></div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div id="contactSection">
+        <div class="h2">Contact (optional)</div>
+        <div class="p">Multiple tags allowed.</div>
+        <div class="grid" id="contactGrid"></div>
+        <div class="hr"></div>
+      </div>
+
+      <div>
+        <div class="h2">Outcome (required)</div>
+        <div class="p">If Miss, choose Short/Long/Left/Right.</div>
+        <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));" id="outcomeGrid">
+          <div class="tile success" data-outcome="success">Success</div>
+          <div class="tile miss" data-outcome="miss">Miss</div>
+        </div>
+
+        <div id="dirSection" class="hidden" style="margin-top:10px;">
+          <div class="grid" id="dirGrid">
+            <div class="tile dir" data-dir="short">Short</div>
+            <div class="tile dir" data-dir="long">Long</div>
+            <div class="tile dir" data-dir="left">Left</div>
+            <div class="tile dir" data-dir="right">Right</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div>
+        <div class="h2">Session notes</div>
+        <div class="p">Saved per date + drill.</div>
+        <textarea id="notesBox" placeholder="What worked? What didn’t?"></textarea>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="btnrow">
+        <button class="btn" id="undoBtn">Undo last shot</button>
+        <span class="summary" id="summary"></span>
+      </div>
+
+      <div class="hr"></div>
+
+      <div>
+        <div class="h2">Session totals (date + drill)</div>
+        <div class="p">Per club totals for the selected date + drill.</div>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Club</th>
+                <th>Success</th>
+                <th>Miss</th>
+                <th>Success %</th>
+                <th>Solid</th>
+                <th>Thin</th>
+                <th>Fat</th>
+                <th>Toe</th>
+                <th>Heel</th>
+                <th>Miss: Short</th>
+                <th>Miss: Long</th>
+                <th>Miss: Left</th>
+                <th>Miss: Right</th>
+              </tr>
+            </thead>
+            <tbody id="totalsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div>
+        <div class="h2">Shots logged (this session)</div>
+        <div class="p">Raw shots for the selected date + drill.</div>
+        <div class="tablewrap">
+          <table style="min-width:680px;">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Drill</th>
+                <th>Club</th>
+                <th>Outcome</th>
+                <th>Miss dir</th>
+                <th>Contact</th>
+              </tr>
+            </thead>
+            <tbody id="shotsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="foot">Data is stored on this device in Safari localStorage. Export from Stats for backup.</div>
+    </div>
+  </div>
+
+  <script type="module" src="log.js?v=1"></script>
+</body>
+</html>

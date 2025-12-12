@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Golf Practice – Stats</title>
+  <link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+  <div class="shell">
+    <div class="topbar">
+      <div class="brand">Golf Practice</div>
+      <div class="nav">
+        <a href="index.html">Log</a>
+        <a class="active" href="stats.html">Stats</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="field"><label>From</label><input id="fromDate" type="date"></div>
+        <div class="field"><label>To</label><input id="toDate" type="date"></div>
+        <div class="field" style="min-width:220px;"><label>Drill</label><select id="drillFilter"></select></div>
+        <div class="field" style="min-width:180px;"><label>Club</label><select id="clubFilter"></select></div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="btnrow">
+        <button class="btn" id="viewByClub">View: By club</button>
+        <button class="btn" id="viewByDrill">View: By drill</button>
+        <button class="btn primary" id="exportCsv">Export CSV (raw shots)</button>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="tablewrap">
+        <table>
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="foot">Excel tip: use miss_left/miss_right/miss_short/miss_long to find common misses.</div>
+    </div>
+  </div>
+
+  <script type="module" src="stats.js?v=1"></script>
+</body>
+</html>

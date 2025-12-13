@@ -8,7 +8,8 @@ import {
   listSessionDates,
   addClubNote, getClubNotes, deleteClubNote,
   exportBackupJSON, importBackupJSON,
-  getRecentNotesForClub, ymdToDate
+  getRecentNotesForClub, ymdToDate,
+  clearAllLogs
 } from "./app.js";
 import { DEFAULT_CLUBS } from "./data.js";
 
@@ -42,6 +43,7 @@ const ssMissLongEl = document.getElementById("ssMissLong");
 const ssNotesListEl = document.getElementById("ssNotesList");
 const shotCountEl = document.getElementById("shotCount");
 const clubTableBody = document.getElementById("clubTableBody");
+const sessionShotsBody = document.getElementById("sessionShotsBody");
 
 const btnPrev = document.getElementById("btnPrev");
 const btnNext = document.getElementById("btnNext");
@@ -57,6 +59,7 @@ const missGrid = document.getElementById("missGrid");
 const btnExportJson = document.getElementById("btnExportJson");
 const btnImportJson = document.getElementById("btnImportJson");
 const importJsonFile = document.getElementById("importJsonFile");
+const btnClearLogs = document.getElementById("btnClearLogs");
 const btnClubs = document.getElementById("btnClubs");
 const modalBackdrop = document.getElementById("modalBackdrop");
 const btnCloseModal = document.getElementById("btnCloseModal");
@@ -426,8 +429,53 @@ function renderTable() {
   }
 
   renderSessionSummary();
+  renderSessionShots();
 
 }
+
+
+function renderSessionShots() {
+  if (!sessionShotsBody) return;
+  const cIndex = clubsIndex();
+  const session = currentSessionShots()
+    .slice()
+    .sort((a,b)=> (a.timestamp||"").localeCompare(b.timestamp||"")); // oldest -> newest
+
+  sessionShotsBody.innerHTML = "";
+  if (!session.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="7" style="text-align:left; color:var(--muted);">No shots yet for this date + drill.</td>`;
+    sessionShotsBody.appendChild(tr);
+    return;
+  }
+
+  for (const s of session) {
+    const tr = document.createElement("tr");
+    const t = (s.timestamp || "").replace("T"," ").slice(11,16); // HH:MM
+    const clubName = cIndex.get(s.clubId)?.name ?? s.clubName ?? s.clubId ?? "";
+    const contact = s.contact || {};
+    const contactTags = Object.entries(contact).filter(([k,v])=>v).map(([k])=>k).join(", ");
+    tr.innerHTML = `
+      <td style="font-family:var(--mono); font-size:.84rem;">${escapeHtml(t || "")}</td>
+      <td>${escapeHtml(clubName)}</td>
+      <td>${escapeHtml(s.context || "")}</td>
+      <td>${escapeHtml(s.outcome || "")}</td>
+      <td>${escapeHtml(s.missDirection || "")}</td>
+      <td>${escapeHtml(contactTags)}</td>
+      <td><button class="btn red small" data-id="${escapeHtml(s.id)}">Delete</button></td>
+    `;
+    tr.querySelector("button")?.addEventListener("click", () => {
+      if (!confirm("Delete this shot?")) return;
+      deleteShotById(s.id);
+      shots = getShots();
+      toast("Deleted shot");
+      renderTable();
+      updatePrevNextButtons();
+    });
+    sessionShotsBody.appendChild(tr);
+  }
+}
+
 
 function commitShot(outcome, missDirection=null) {
   if (!selectedDrillId) {

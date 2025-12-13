@@ -1,6 +1,7 @@
 import {
   getClubs, getDrills, getShots, todayYMD,
-  aggregateByClub, pct, toCSV, downloadText, toast, getClubNotes, exportBackupJSON, importBackupJSON
+  aggregateByClub, pct, toCSV, downloadText, toast, getClubNotes, exportBackupJSON, importBackupJSON,
+  deleteShotById, clearAllLogs
 } from "./app.js";
 
 const dateMode = document.getElementById("dateMode");
@@ -17,6 +18,7 @@ const btnExportJsonStats = document.getElementById("btnExportJsonStats");
 const btnImportJsonStats = document.getElementById("btnImportJsonStats");
 const importJsonFileStats = document.getElementById("importJsonFileStats");
 const btnExport = document.getElementById("btnExport");
+const btnClearLogsStats = document.getElementById("btnClearLogsStats");
 
 let clubs = getClubs();
 let drills = getDrills();
@@ -179,6 +181,18 @@ function renderByClub(filtered) {
       <td>${a.miss_right}</td>
     `;
     tbody.appendChild(tr);
+    const btn = tr.querySelector("button[data-id]");
+    if (btn) {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-id");
+        if (!id) return;
+        if (!confirm("Delete this shot?")) return;
+        deleteShotById(id);
+        shots = getShots();
+        toast("Deleted shot");
+        applyFilters();
+      });
+    }
   }
 }
 
@@ -272,6 +286,7 @@ function renderRaw(filtered) {
       <th>Heel</th>
       <th>Notes</th>
       <th>Success % (session)</th>
+      <th>Delete</th>
     </tr>
   `;
   tbody.innerHTML = "";
@@ -295,7 +310,21 @@ function renderRaw(filtered) {
       <td>${c.heel ? 1 : 0}</td>
       <td>${s.__notes_latest ?? ""}</td>
       <td>${s.__success_pct_session ?? ""}</td>
+      <td><button class="btn red small" data-id="${s.id ?? ""}">Delete</button></td>
     `;
+    const btn = tr.querySelector('button[data-id]');
+    if (btn) {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        if (!id) return;
+        if (!confirm('Delete this shot?')) return;
+        deleteShotById(id);
+        shots = getShots();
+        toast('Deleted shot');
+        applyFilters();
+      });
+    }
+
     tbody.appendChild(tr);
   }
 }
@@ -398,3 +427,13 @@ btnExport.addEventListener("click", exportCSV);
 
 renderFilters();
 applyFilters();
+
+
+// Clear logs
+if (btnClearLogsStats) {
+  btnClearLogsStats.addEventListener("click", () => {
+    if (!confirm("Clear ALL shots + notes on this device? This cannot be undone.")) return;
+    clearAllLogs();
+    setTimeout(() => location.reload(), 150);
+  });
+}

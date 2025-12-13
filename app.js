@@ -80,6 +80,15 @@ export function deleteShotById(id) {
   saveJSON(KEYS.SHOTS, shots);
 }
 
+export function clearAllLogs() {
+  // Clears all shots + notes on this device/browser. Keeps clubs + drills.
+  localStorage.removeItem(KEYS.SHOTS);
+  localStorage.removeItem(KEYS.NOTES);
+  localStorage.removeItem(KEYS.CLUB_NOTES);
+  toast("Cleared logs + notes");
+}
+
+
 export function getUIState() {
   return loadJSON(KEYS.UI, { selectedDate: todayYMD(), selectedDrillId: "", selectedClubId: "" });
 }

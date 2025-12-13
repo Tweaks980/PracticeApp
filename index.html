@@ -19,6 +19,7 @@
         <button id="btnClubs" class="primary">Clubs</button>
         <button id="btnExportJson" class="btn">Export JSON</button>
         <button id="btnImportJson" class="btn">Import JSON</button>
+        <button id="btnClearLogs" class="btn red" title="Clears all shots + notes on this device (clubs/drills stay)">Clear logs</button>
         <input id="importJsonFile" type="file" accept="application/json" class="hidden" />
       </div>
     </div>
@@ -208,6 +209,30 @@
           <tbody id="clubTableBody"></tbody>
         </table>
       </div>
+      <div class="hr"></div>
+      <div class="header" style="margin-bottom:6px;">
+        <div>
+          <h2 style="font-size:1rem; margin:0;">Session shots</h2>
+          <p style="margin:4px 0 0;">Shots for the selected <strong>date + drill</strong>. Delete any shot if needed.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Club</th>
+              <th>Context</th>
+              <th>Outcome</th>
+              <th>Miss dir</th>
+              <th>Contact</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="sessionShotsBody"></tbody>
+        </table>
+      </div>
+
 
       
     </div>

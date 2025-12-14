@@ -6,9 +6,8 @@ import {
   toast, fmtClubPill,
   shotsForDateAndDrill, aggregateByClub, pct,
   listSessionDates,
-  addClubNote, getClubNotes, deleteClubNote,
   exportBackupJSON, importBackupJSON,
-  getRecentNotesForClub, ymdToDate,
+  ymdToDate,
   clearAllLogs
 } from "./app.js";
 import { DEFAULT_CLUBS } from "./data.js";
@@ -24,9 +23,8 @@ const clubLabelEl = document.getElementById("clubLabel");
 const clubLREl = document.getElementById("clubLR");
 const contextWrap = document.getElementById("contextWrap");
 const contextSelect = document.getElementById("contextSelect");
-const noteInputEl = document.getElementById("noteInput");
-const btnAddNote = document.getElementById("btnAddNote");
-const notesListEl = document.getElementById("notesList");
+const shotNoteInputEl = document.getElementById("shotNoteInput");
+const shotNoteAttachedBadgeEl = document.getElementById("shotNoteAttachedBadge");
 
 const sessionSummaryEl = document.getElementById("sessionSummary");
 const ssTitleEl = document.getElementById("ssTitle");
@@ -40,7 +38,6 @@ const ssMissLeftEl = document.getElementById("ssMissLeft");
 const ssMissRightEl = document.getElementById("ssMissRight");
 const ssMissShortEl = document.getElementById("ssMissShort");
 const ssMissLongEl = document.getElementById("ssMissLong");
-const ssNotesListEl = document.getElementById("ssNotesList");
 const shotCountEl = document.getElementById("shotCount");
 const clubTableBody = document.getElementById("clubTableBody");
 const sessionShotsBody = document.getElementById("sessionShotsBody");
@@ -74,12 +71,31 @@ let shots = getShots();
 
 let ui = getUIState();
 let selectedDate = ui.selectedDate || todayYMD();
-let selectedDrillId = ui.selectedDrillId || drills[0]?.id || "";
-let selectedClubId = ui.selectedClubId || clubs[0]?.id || "";
+let selectedDrillId = ui.selectedDrillId || ((drills[0] && drills[0].id) ? drills[0].id : "") || "";
+let selectedClubId = ui.selectedClubId || ((clubs[0] && clubs[0].id) ? clubs[0].id : "") || "";
 
 // Context is optional and only enabled for certain drills.
 // Stored on each shot as a simple string, default "".
 let selectedContext = "";
+
+// Shot note attaches to the next committed shot, then clears.
+let pendingShotNote = "";
+
+function flashShotNoteAttached() {
+  if (!shotNoteAttachedBadgeEl) return;
+  // Restart animation if fired repeatedly.
+  shotNoteAttachedBadgeEl.classList.remove("hidden");
+  shotNoteAttachedBadgeEl.classList.remove("pop");
+  // Force reflow so the animation restarts reliably.
+  void shotNoteAttachedBadgeEl.offsetWidth;
+  shotNoteAttachedBadgeEl.classList.add("pop");
+
+  window.clearTimeout(window.__shotNoteAttachedT);
+  window.__shotNoteAttachedT = window.setTimeout(() => {
+    shotNoteAttachedBadgeEl.classList.add("hidden");
+    shotNoteAttachedBadgeEl.classList.remove("pop");
+  }, 1500);
+}
 
 const DRILL_CONTEXTS = {
   "arc-depth-woods": ["Mat", "Tiny Tee", "Small Tee", "Mid Tee", "High Tee"],
@@ -176,7 +192,6 @@ function renderClubPills() {
       selectedClubId = c.id;
       setUIState({ selectedClubId });
       updateSelectedClubLabel();
-      renderNotes();
       renderSessionSummary();
       renderClubPills();
     });
@@ -191,67 +206,13 @@ function updateSelectedClubLabel() {
   if (clubLREl) clubLREl.textContent = c && c.lrRef ? ` ${c.lrRef}` : "";
 }
 
-function renderNotes() {
-  if (!notesListEl) return;
-  if (!selectedClubId) { notesListEl.innerHTML = ""; return; }
-
-  const notes = getClubNotes(selectedDate, selectedClubId)
-    .slice()
-    .sort((a,b)=> (b.timestamp||"").localeCompare(a.timestamp||"")); // newest first
-
-  if (!notes.length) {
-    notesListEl.innerHTML = `<div class="muted" style="font-size:.9rem;">No notes yet for this club on this date.</div>`;
-    return;
-  }
-
-  notesListEl.innerHTML = "";
-  for (const n of notes) {
-    const wrap = document.createElement("div");
-    wrap.className = "noteItem";
-
-    const left = document.createElement("div");
-    left.style.flex = "1";
-
-    const text = document.createElement("div");
-    text.className = "text";
-    text.textContent = n.text || "";
-    left.appendChild(text);
-
-    const meta = document.createElement("div");
-    meta.className = "meta";
-    const t = (n.timestamp || "").replace("T"," ").slice(0,16);
-    meta.textContent = t || "";
-    left.appendChild(meta);
-
-    const right = document.createElement("div");
-    right.style.display = "flex";
-    right.style.gap = "6px";
-
-    const del = document.createElement("button");
-    del.type = "button";
-    del.title = "Delete note";
-    del.textContent = "Delete";
-    del.addEventListener("click", () => {
-      deleteClubNote(selectedDate, selectedClubId, n.id);
-      renderNotes();
-      toast("Deleted note");
-    });
-
-    right.appendChild(del);
-    wrap.appendChild(left);
-    wrap.appendChild(right);
-    notesListEl.appendChild(wrap);
-  }
-}
-
-
 function renderSessionSummary() {
   if (!sessionSummaryEl) return;
 
   const d = drillMap.get(selectedDrillId);
   const c = clubsIndex().get(selectedClubId);
-  const drillName = d?.name || "—";
-  const clubName = c?.name || "—";
+  const drillName = (d && d.name) ? d.name : "—";
+  const clubName = (c && c.name) ? c.name : "—";
 
   // Session scope: selected date + selected drill + selected club
   const sessionAll = currentSessionShots();
@@ -333,23 +294,6 @@ function renderSessionSummary() {
     if (nShots) avg30Text = `${Math.round((nSuccess / nShots) * 100)}% (${nSuccess}/${nShots})`;
   }
   if (ssAvg30El) ssAvg30El.textContent = avg30Text;
-
-  // Recent notes for this club (across dates)
-  if (ssNotesListEl) {
-    const recents = getRecentNotesForClub(selectedClubId, 2);
-    if (!recents.length) {
-      ssNotesListEl.innerHTML = `<div class="muted" style="font-size:.9rem;">No recent notes for this club.</div>`;
-    } else {
-      ssNotesListEl.innerHTML = "";
-      for (const n of recents) {
-        const div = document.createElement("div");
-        div.className = "ssNote";
-        const t = (n.timestamp || "").replace("T"," ").slice(0,16);
-        div.innerHTML = `<div class="t">${escapeHtml(n.text || "")}</div><div class="m">${escapeHtml(t)}</div>`;
-        ssNotesListEl.appendChild(div);
-      }
-    }
-  }
 }
 
 
@@ -444,7 +388,7 @@ function renderSessionShots() {
   sessionShotsBody.innerHTML = "";
   if (!session.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="7" style="text-align:left; color:var(--muted);">No shots yet for this date + drill.</td>`;
+    tr.innerHTML = `<td colspan="8" style="text-align:left; color:var(--muted);">No shots yet for this date + drill.</td>`;
     sessionShotsBody.appendChild(tr);
     return;
   }
@@ -452,19 +396,21 @@ function renderSessionShots() {
   for (const s of session) {
     const tr = document.createElement("tr");
     const t = (s.timestamp || "").replace("T"," ").slice(11,16); // HH:MM
-    const clubName = cIndex.get(s.clubId)?.name ?? s.clubName ?? s.clubId ?? "";
+    const _clubObj = cIndex.get(s.clubId); const clubName = (_clubObj && _clubObj.name) || s.clubName || s.clubId || "";
     const contact = s.contact || {};
     const contactTags = Object.entries(contact).filter(([k,v])=>v).map(([k])=>k).join(", ");
     tr.innerHTML = `
       <td style="font-family:var(--mono); font-size:.84rem;">${escapeHtml(t || "")}</td>
       <td>${escapeHtml(clubName)}</td>
       <td>${escapeHtml(s.context || "")}</td>
+      <td>${escapeHtml(s.shot_note || "")}</td>
       <td>${escapeHtml(s.outcome || "")}</td>
       <td>${escapeHtml(s.missDirection || "")}</td>
       <td>${escapeHtml(contactTags)}</td>
       <td><button class="btn red small" data-id="${escapeHtml(s.id)}">Delete</button></td>
     `;
-    tr.querySelector("button")?.addEventListener("click", () => {
+    const _btn = tr.querySelector("button");
+    if (_btn) _btn.addEventListener("click", () => {
       if (!confirm("Delete this shot?")) return;
       deleteShotById(s.id);
       shots = getShots();
@@ -486,18 +432,30 @@ function commitShot(outcome, missDirection=null) {
     toast("Pick a club first.");
     return;
   }
+
+  // Harden: a Miss doesn't "commit" until a miss direction is chosen.
+  if (outcome === "miss" && !missDirection) {
+    missDirWrap.classList.remove("hidden");
+    toast("Pick miss direction");
+    return;
+  }
+
+  // Persist until the shot is committed (Success OR Miss+Direction).
+  const noteRaw = (shotNoteInputEl ? shotNoteInputEl.value : pendingShotNote) || "";
+  const noteTrim = String(noteRaw).trim();
   const d = drillMap.get(selectedDrillId);
   const c = clubsIndex().get(selectedClubId);
   const shot = {
-    id: crypto?.randomUUID?.() || (Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 9)),
+    id: (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 9))),
     timestamp: new Date().toISOString(),
     date: selectedDate, // important: selected date (reviewable later)
     drillId: selectedDrillId,
-    drillName: d?.name ?? selectedDrillId,
+    drillName: (d && d.name) ? d.name : selectedDrillId,
     clubId: selectedClubId,
-    clubName: c?.name ?? selectedClubId,
+    clubName: (c && c.name) ? c.name : selectedClubId,
     context: selectedContext || "",
     contact: isPuttingDrill(selectedDrillId) ? {} : { ...currentContact },
+    shot_note: noteTrim,
     outcome,
     missDirection: outcome === "miss" ? missDirection : null,
   };
@@ -506,7 +464,13 @@ function commitShot(outcome, missDirection=null) {
   shots = getShots();
 
   resetContact();
+  // Clear shot note after it has been attached to this shot
+  pendingShotNote = "";
+  if (shotNoteInputEl) shotNoteInputEl.value = "";
   missDirWrap.classList.add("hidden");
+
+  // Subtle visual confirmation that the note was attached.
+  if (noteTrim) flashShotNoteAttached();
 
   toast(outcome === "success" ? "Logged: Success" : `Logged: Miss (${missDirection})`);
   renderTable();
@@ -556,8 +520,7 @@ function goToDrillOffset(delta) {
   renderContextPicker();
   renderTable();
   updatePrevNextButtons();
-  renderNotes();
-  toast(`Drill: ${drills.find(d=>d.id===selectedDrillId)?.name || selectedDrillId}`);
+  toast(`Drill: ${(() => { const _d = drills.find(d=>d.id===selectedDrillId); return (_d && _d.name) ? _d.name : selectedDrillId; })()}`);
 }
 
 // --- Clubs modal ---
@@ -642,7 +605,7 @@ function renderClubsEditor() {
 }
 
 function escapeHtml(s) {
-  return String(s ?? "")
+  return String((s === null || s === undefined) ? "" : s)
     .replaceAll("&","&amp;")
     .replaceAll("<","&lt;")
     .replaceAll(">","&gt;")
@@ -693,8 +656,7 @@ function init() {
     setUIState({ selectedDate });
     renderTable();
     updatePrevNextButtons();
-    renderNotes();
-    toast(`Viewing ${selectedDate}`);
+      toast(`Viewing ${selectedDate}`);
   });
   // Drill
   renderDrillSelect();
@@ -707,12 +669,11 @@ function init() {
     renderContextPicker();
     renderTable();
     updatePrevNextButtons();
-    renderNotes();
-  });
+    });
 
   // Default drill if none
   if (!selectedDrillId) {
-    selectedDrillId = drills[0]?.id || "";
+    selectedDrillId = (drills[0] && drills[0].id) ? drills[0].id : "";
     drillEl.value = selectedDrillId;
     setUIState({ selectedDrillId });
   }
@@ -725,6 +686,13 @@ function init() {
   if (contextSelect) {
     contextSelect.addEventListener("change", () => {
       selectedContext = contextSelect.value || "";
+    });
+  }
+
+  // Shot note
+  if (shotNoteInputEl) {
+    shotNoteInputEl.addEventListener("input", () => {
+      pendingShotNote = shotNoteInputEl.value || "";
     });
   }
 
@@ -744,19 +712,6 @@ function init() {
       reader.readAsText(file);
       // reset so selecting the same file twice still triggers change
       importJsonFile.value = "";
-    });
-  }
-
-  // Notes
-  if (btnAddNote && noteInputEl) {
-    btnAddNote.addEventListener("click", () => {
-      if (!selectedClubId) return toast("Pick a club first.");
-      const note = addClubNote(selectedDate, selectedClubId, noteInputEl.value, selectedDrillId);
-      if (!note) return toast("Type a note first.");
-      noteInputEl.value = "";
-      renderNotes();
-      renderSessionSummary();
-      toast("Saved note");
     });
   }
 
@@ -809,7 +764,6 @@ function init() {
   updatePuttingUI();
   renderContextPicker();
   updateSelectedClubLabel();
-  renderNotes();
   renderTable();
   updatePrevNextButtons();
 }

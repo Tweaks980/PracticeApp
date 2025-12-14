@@ -59,7 +59,24 @@ export function setClubs(clubs) {
 export function getDrills() {
   const stored = loadJSON(KEYS.DRILLS, null);
   const base = ensure28Drills(DEFAULT_DRILLS);
-  if (Array.isArray(stored) && stored.length) return ensure28Drills(stored);
+
+  // Lightweight migration: if you already have drills saved, append any new default drills
+  // (keeps your customized drills/order; just ensures new drills appear).
+  if (Array.isArray(stored) && stored.length) {
+    const current = ensure28Drills(stored);
+    const have = new Set(current.map(d => (d && d.id) ? d.id : null).filter(Boolean));
+    let changed = false;
+    for (const d of base) {
+      if (d && d.id && !have.has(d.id)) {
+        current.push(d);
+        have.add(d.id);
+        changed = true;
+      }
+    }
+    if (changed) saveJSON(KEYS.DRILLS, current);
+    return current;
+  }
+
   saveJSON(KEYS.DRILLS, base);
   return base;
 }
@@ -85,7 +102,7 @@ export function clearAllLogs() {
   localStorage.removeItem(KEYS.SHOTS);
   localStorage.removeItem(KEYS.NOTES);
   localStorage.removeItem(KEYS.CLUB_NOTES);
-  toast("Cleared logs + notes");
+  toast("Cleared shots");
 }
 
 
@@ -129,7 +146,7 @@ export function aggregateByClub(shots, clubsIndex) {
     if (!out[clubId]) {
       out[clubId] = {
         clubId,
-        clubName: clubsIndex.get(clubId)?.name ?? clubId,
+        clubName: ((clubsIndex.get(clubId) && clubsIndex.get(clubId).name) ? clubsIndex.get(clubId).name : clubId),
         outcomeTotal: 0,
         success: 0,
         miss: 0,
@@ -162,8 +179,8 @@ export function pct(n, d) {
 
 export function toCSV(rows) {
   const esc = (v) => {
-    const s = String(v ?? "");
-    if (/[,"\n]/.test(s)) return `"${s.replaceAll('"','""')}"`;
+    const s = String((v === null || v === undefined) ? "" : v);
+    if (/[,"\n]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
     return s;
   };
   const keys = Object.keys(rows[0] || {});
@@ -222,7 +239,7 @@ export function addClubNote(dateYMD, clubId, text, drillId = "") {
   const key = `${dateYMD}__${clubId}`;
   const arr = Array.isArray(all[key]) ? all[key] : [];
   const note = {
-    id: (crypto?.randomUUID?.() || uid()),
+    id: ((typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : uid()),
     timestamp: new Date().toISOString(),
     date: dateYMD,
     clubId,
@@ -269,6 +286,32 @@ export function ymdToDate(ymd) {
 }
 
 // --- Backup / Restore (JSON) ---
+
+function normalizeShotRecord(s) {
+  if (!s || typeof s !== "object") return null;
+  const out = { ...s };
+
+  // Ensure shot_note round-trips cleanly (and support the occasional older key).
+  if (out.shot_note === undefined || out.shot_note === null) {
+    if (out.shotNote !== undefined && out.shotNote !== null) out.shot_note = String(out.shotNote);
+    else out.shot_note = "";
+  } else {
+    out.shot_note = String(out.shot_note);
+  }
+
+  return out;
+}
+
+function normalizeShotArray(arr) {
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  for (const s of arr) {
+    const n = normalizeShotRecord(s);
+    if (n) out.push(n);
+  }
+  return out;
+}
+
 export function exportBackupJSON() {
   const payload = {
     meta: {
@@ -277,7 +320,7 @@ export function exportBackupJSON() {
       keys: KEYS,
     },
     data: {
-      shots: loadJSON(KEYS.SHOTS, []),
+      shots: normalizeShotArray(loadJSON(KEYS.SHOTS, [])),
       clubs: loadJSON(KEYS.CLUBS, []),
       drills: loadJSON(KEYS.DRILLS, []),
       ui: loadJSON(KEYS.UI, {}),
@@ -299,13 +342,13 @@ export function importBackupJSON(text) {
     toast("Invalid JSON file");
     return { ok: false, error: "invalid_json" };
   }
-  const data = parsed?.data;
+  const data = parsed && parsed.data;
   if (!data || typeof data !== "object") {
     toast("Backup file missing data");
     return { ok: false, error: "missing_data" };
   }
   // Write only our known keys; fall back to empty structures
-  saveJSON(KEYS.SHOTS, Array.isArray(data.shots) ? data.shots : []);
+  saveJSON(KEYS.SHOTS, normalizeShotArray(data.shots));
   saveJSON(KEYS.CLUBS, Array.isArray(data.clubs) ? data.clubs : DEFAULT_CLUBS);
   saveJSON(KEYS.DRILLS, Array.isArray(data.drills) ? data.drills : ensure28Drills(DEFAULT_DRILLS));
   saveJSON(KEYS.UI, data.ui && typeof data.ui === "object" ? data.ui : { selectedDate: todayYMD(), selectedDrillId: "", selectedClubId: "" });

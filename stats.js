@@ -1,6 +1,6 @@
 import {
   getClubs, getDrills, getShots, todayYMD,
-  aggregateByClub, pct, toCSV, downloadText, toast, getClubNotes, exportBackupJSON, importBackupJSON,
+  aggregateByClub, pct, toCSV, downloadText, toast, exportBackupJSON, importBackupJSON,
   deleteShotById, clearAllLogs
 } from "./app.js";
 
@@ -82,20 +82,11 @@ function enrichShots(arr) {
     g.shots += 1;
     if (s.outcome === "success") g.success += 1;
   }
-  const notesCache = new Map();
-  function getLatestNote(date, clubId) {
-    const key = `${date}__${clubId}`;
-    if (notesCache.has(key)) return notesCache.get(key);
-    const notes = getClubNotes(date, clubId).slice().sort((a,b)=> (b.timestamp||"").localeCompare(a.timestamp||""));
-    const latest = notes[0]?.text || "";
-    notesCache.set(key, latest);
-    return latest;
-  }
   return arr.map(s => {
     const k = `${s.date||""}__${s.drillId||""}__${s.clubId||""}`;
     const g = group.get(k) || { shots:0, success:0 };
     const pct = g.shots ? `${Math.round((g.success / g.shots) * 100)}%` : "";
-    return { ...s, __success_pct_session: pct, __notes_latest: getLatestNote(s.date||"", s.clubId||"") };
+    return { ...s, __success_pct_session: pct };
   });
 }
 
@@ -132,7 +123,6 @@ function renderByClub(filtered) {
       <th>Fat</th>
       <th>Toe</th>
       <th>Heel</th>
-      <th>Notes</th>
       <th>Success % (session)</th>
       <th>Miss: Short</th>
       <th>Miss: Long</th>
@@ -145,19 +135,6 @@ function renderByClub(filtered) {
   // If filters narrow to a single date + drill, "session" == this filtered set.
   const isSingleSession = (new Set(filtered.map(s => s.date || ""))).size <= 1
     && (new Set(filtered.map(s => s.drillId || ""))).size <= 1;
-
-  // Notes count: sum notes for each unique (date, club) present in the filtered set
-  const notesCountCache = new Map(); // clubId -> count
-  function notesCountForClub(clubId) {
-    if (notesCountCache.has(clubId)) return notesCountCache.get(clubId);
-    const dates = new Set(filtered.filter(s => s.clubId === clubId).map(s => s.date).filter(Boolean));
-    let count = 0;
-    for (const d of dates) {
-      count += getClubNotes(d, clubId).length;
-    }
-    notesCountCache.set(clubId, count);
-    return count;
-  }
 
   const agg = aggregateByClub(filtered, clubMap);
   for (const a of agg) {
@@ -173,7 +150,6 @@ function renderByClub(filtered) {
       <td>${a.fat}</td>
       <td>${a.toe}</td>
       <td>${a.heel}</td>
-      <td>${notesCountForClub(a.clubId)}</td>
       <td>${sessionPct}</td>
       <td>${a.miss_short}</td>
       <td>${a.miss_long}</td>
@@ -277,6 +253,7 @@ function renderRaw(filtered) {
       <th>Drill</th>
       <th>Club</th>
       <th>Context</th>
+      <th>Shot note</th>
       <th>Outcome</th>
       <th>Miss dir</th>
       <th>Solid</th>
@@ -284,7 +261,6 @@ function renderRaw(filtered) {
       <th>Fat</th>
       <th>Toe</th>
       <th>Heel</th>
-      <th>Notes</th>
       <th>Success % (session)</th>
       <th>Delete</th>
     </tr>
@@ -301,6 +277,7 @@ function renderRaw(filtered) {
       <td>${drillMap.get(s.drillId)?.name ?? s.drillName ?? s.drillId ?? ""}</td>
       <td>${clubMap.get(s.clubId)?.name ?? s.clubName ?? s.clubId ?? ""}</td>
       <td>${s.context ?? ""}</td>
+      <td>${s.shot_note ?? ""}</td>
       <td>${s.outcome ?? ""}</td>
       <td>${s.missDirection ?? ""}</td>
       <td>${c.solid ? 1 : 0}</td>
@@ -308,7 +285,6 @@ function renderRaw(filtered) {
       <td>${c.fat ? 1 : 0}</td>
       <td>${c.toe ? 1 : 0}</td>
       <td>${c.heel ? 1 : 0}</td>
-      <td>${s.__notes_latest ?? ""}</td>
       <td>${s.__success_pct_session ?? ""}</td>
       <td><button class="btn red small" data-id="${s.id ?? ""}">Delete</button></td>
     `;
@@ -342,28 +318,12 @@ function exportCSV() {
     if (s.outcome === "success") g.success += 1;
   }
 
-  // notes per (date + club) -> latest note + joined notes
-  const notesCache = new Map();
-  function getNotesFor(date, clubId) {
-    const key = `${date}__${clubId}`;
-    if (notesCache.has(key)) return notesCache.get(key);
-    const notes = getClubNotes(date, clubId)
-      .slice()
-      .sort((a,b)=> (b.timestamp||"").localeCompare(a.timestamp||"")); // newest first
-    const latest = notes[0]?.text || "";
-    const joined = notes.map(n => `[${(n.timestamp||"").replace("T"," ").slice(0,16)}] ${n.text}`).join(" | ");
-    const val = { latest, joined };
-    notesCache.set(key, val);
-    return val;
-  }
-
   const rows = all.map(s => {
     const c = s.contact || {};
     const miss = s.missDirection ?? "";
     const k = `${s.date||""}__${s.drillId||""}__${s.clubId||""}`;
     const g = group.get(k) || { shots:0, success:0 };
     const successPct = g.shots ? Math.round((g.success / g.shots) * 100) : "";
-    const notes = getNotesFor(s.date||"", s.clubId||"");
     return {
       id: s.id ?? "",
       date: s.date ?? "",
@@ -384,9 +344,8 @@ function exportCSV() {
       fat: c.fat ? 1 : 0,
       toe: c.toe ? 1 : 0,
       heel: c.heel ? 1 : 0,
+      shot_note: s.shot_note ?? "",
       success_pct_session: successPct,
-      notes_latest: notes.latest,
-      notes_all: notes.joined,
     };
   });
 
@@ -432,7 +391,7 @@ applyFilters();
 // Clear logs
 if (btnClearLogsStats) {
   btnClearLogsStats.addEventListener("click", () => {
-    if (!confirm("Clear ALL shots + notes on this device? This cannot be undone.")) return;
+    if (!confirm("Clear ALL shots on this device? This cannot be undone.")) return;
     clearAllLogs();
     setTimeout(() => location.reload(), 150);
   });

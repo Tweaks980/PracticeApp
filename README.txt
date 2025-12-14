@@ -21,3 +21,7 @@ Defaults updated: includes Driver + full drill list.
 Backup:
 - Use Export JSON to download a full backup (shots, clubs, drills, notes).
 - Use Import JSON to restore on a new phone/browser.
+
+Shot note:
+- Optional free-text note that attaches to the next committed shot (Success or Miss+Direction).
+- Stored on each shot as "shot_note" (appears in session shots table, Stats raw table, CSV, and JSON backup).

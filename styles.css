@@ -228,6 +228,22 @@ input[type="date"]:focus, select:focus, input:focus{
 }
 .badge strong{color:var(--text)}
 
+/* Subtle post-commit indicator when a shot note is attached */
+.badge.noteAttached{
+  background:#fff7ed;
+  border-color:#fed7aa;
+  color:#9a3412;
+}
+.badge.noteAttached.pop{
+  animation: noteAttachedPop 1.4s ease both;
+}
+@keyframes noteAttachedPop{
+  0%{opacity:0; transform:translateY(2px)}
+  18%{opacity:1; transform:translateY(0)}
+  80%{opacity:1; transform:translateY(0)}
+  100%{opacity:0; transform:translateY(-1px)}
+}
+
 .table-wrap{
   margin-top: 12px;
   border: 1px solid var(--border);

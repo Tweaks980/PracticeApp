@@ -31,6 +31,9 @@ export const DEFAULT_DRILLS = [
   {"id": "trajectory-high-windows", "name": "Trajectory High Windows", "desc": "", "constraints": ["(3) High 90’+", "Keys: High = ball slightly forward, slightly less shaft lean, fuller finish, extended trail arm; keep speed up", "Keep tempo constant; adjust finish to change height"]},
   {"id": "under-over-contact", "name": "Under / Over Contact", "desc": "", "constraints": ["Miss low, miss high, then strike center", "Find center of the face on all reps", "Use spray"]},
   {"id": "variability", "name": "Variability", "desc": "", "constraints": ["Address toe/heel but still strike center", "Toe → center, heel → center, center → center", "Priority: center contact and staying under 9 yards off"]}
+  ,{"id": "simulator-round", "name": "Simulator Round", "desc": "", "constraints": ["Log shots during a simulator round."]}
+  ,{"id": "real-round", "name": "Real Round", "desc": "", "constraints": ["Log shots during a real on-course round."]}
+
 ];
 
 // Fill out to 28 if you want; the UI supports any number.
